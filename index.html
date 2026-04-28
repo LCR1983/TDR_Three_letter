@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ディズニースリーレター検索</title>
+<style>
+  /* 検索バーのみを際立たせるミニマルデザイン */
+  body { 
+    font-family: 'Helvetica Neue', Arial, sans-serif; 
+    background-color: #f4f6f9; 
+    color: #333; 
+    max-width: 600px; 
+    margin: 0 auto; 
+    padding: 10vh 20px 20px 20px; 
+  }
+  
+  /* 検索バー */
+  .search-box { 
+    width: 100%; 
+    padding: 18px 24px; 
+    font-size: 18px; 
+    border: none; 
+    border-radius: 30px; 
+    box-sizing: border-box; 
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    transition: box-shadow 0.3s ease;
+  }
+  .search-box:focus { 
+    outline: none; 
+    box-shadow: 0 6px 20px rgba(52, 152, 219, 0.25);
+  }
+
+  /* サブ機能：全一覧表示ボタン */
+  .toggle-container {
+    text-align: center;
+    margin-top: 15px;
+  }
+  .toggle-btn {
+    background: none;
+    border: none;
+    color: #7f8c8d;
+    font-size: 13px;
+    text-decoration: underline;
+    cursor: pointer;
+    padding: 5px 10px;
+  }
+  .toggle-btn:hover {
+    color: #3498db;
+  }
+
+  /* タブのスタイル（初期は非表示） */
+  #tabContainer {
+    display: none;
+    justify-content: center;
+    margin-top: 20px;
+    border-bottom: 2px solid #ddd;
+  }
+  .tab-btn {
+    background: none;
+    border: none;
+    padding: 10px 20px;
+    font-size: 15px;
+    font-weight: bold;
+    color: #7f8c8d;
+    cursor: pointer;
+    position: relative;
+    outline: none;
+  }
+  .tab-btn.active {
+    color: #3498db;
+  }
+  .tab-btn.active::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    width: 100%;
+    height: 3px;
+    background-color: #3498db;
+    border-radius: 3px 3px 0 0;
+  }
+
+  /* 結果表示エリア（初期は非表示） */
+  #resultArea {
+    display: none;
+    margin-top: 20px;
+  }
+
+  /* リストのデザイン */
+  ul { 
+    list-style-type: none; 
+    padding: 0; 
+    margin: 0;
+  }
+  li { 
+    background: #fff; 
+    margin-bottom: 8px; 
+    padding: 14px 20px; 
+    border-radius: 12px; 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.04); 
+  }
+  
+  .name {
+    font-weight: 500;
+    font-size: 0.95em;
+    line-height: 1.4;
+    padding-right: 15px;
+  }
+  
+  .code { 
+    font-weight: 900; 
+    color: #e74c3c; 
+    font-size: 1.15em; 
+    background-color: #fdedec;
+    padding: 4px 12px;
+    border-radius: 6px;
+    white-space: nowrap;
+    letter-spacing: 1px;
+  }
+  
+  .no-result {
+    text-align: center;
+    padding: 20px;
+    color: #95a5a6;
+    display: none;
+  }
+</style>
+</head>
+<body>
+
+  <input type="text" id="searchInput" class="search-box" placeholder="スリーレター・施設名を入力...">
+  
+  <div class="toggle-container">
+    <button id="toggleBtn" class="toggle-btn">全ロケーション一覧を表示</button>
+  </div>
+
+  <div id="tabContainer">
+    <button class="tab-btn active" data-category="TDL">TDL</button>
+    <button class="tab-btn" data-category="TDS">TDS</button>
+    <button class="tab-btn" data-category="OUT">TDR</button>
+  </div>
+
+  <div id="resultArea">
+    <ul id="list"></ul>
+    <div id="noResult" class="no-result">一致するスリーレターが見つかりません</div>
+  </div>
+
+  <script>
+    // データ配列。カテゴリ分けのために「category: "〇〇"」を追加しています。
+    // TDLのデータは "TDL"、TDSのデータは "TDS"、パーク外のデータは "OUT" にご自身で設定してください。
+    const locations = [
+      // ----- サンプルデータ（ここに元の全データを入れて、categoryを付与してください） -----
+      
+      // TDLの例
+      { code: "OMB", name: "オムニバス", category: "TDL" },
+      { code: "PNA", name: "ペニーアーケード", category: "TDL" },
+      { code: "CAM", name: "カメラセンター", category: "TDL" },
+      { code: "GRE", name: "グランドエンポーリアム", category: "TDL" },
+      { code: "BAL", name: "バルーンベンダー(L)", category: "TDL" },
+      { code: "GRA", name: "グランドサーキット・レースウェイ", category: "TDL" },
+      { code: "SIL", name: "シルエットスタジオ", category: "TDL" },
+      { code: "TCF", name: "タウンセンターファッション", category: "TDL" },
+      { code: "D&C", name: "ディズニー＆カンパニー", category: "TDL" },
+      { code: "TST", name: "トイ・ステーション", category: "TDL" },
+      { code: "HOG", name: "ハウス・オブ・グリーティング", category: "TDL" },
+      { code: "HJW", name: "ハリントンズ・ジュエリー＆ウォッチ", category: "TDL" },
+      { code: "BB2", name: "ビビディ・バビディ・ブティック（TDL）", category: "TDL" },
+      { code: "PSP", name: "ペイストリーパレス", category: "TDL" },
+      { code: "HOM", name: "ホームストア", category: "TDL" },
+      { code: "MAG", name: "マジックショップ", category: "TDL" },
+      { code: "WCO", name: "ワールドバザール・コンフェクショナリー", category: "TDL" },
+      { code: "ICC", name: "アイスクリームコーン", category: "TDL" },
+      { code: "ESC", name: "イーストサイド・カフェ", category: "TDL" },
+      { code: "GAW", name: "グレートアメリカン・ワッフルカンパニー", category: "TDL" },
+      { code: "C33", name: "クラブ33", category: "TDL" },
+      { code: "SHC", name: "スウィートハート・カフェ", category: "TDL" },
+      { code: "CSC", name: "センターストリート・コーヒーハウス", category: "TDL" },
+      { code: "RFC", name: "リフレッシュメントコーナー", category: "TDL" },
+      { code: "JRH", name: "れすとらん北齋", category: "TDL" },
+      { code: "WRR", name: "ウエスタンリバー鉄道", category: "TDL" },
+      { code: "PRT", name: "カリブの海賊", category: "TDL" },
+      { code: "JGC", name: "ジャングルクルーズ：ワイルドライフ・エクスペディション", category: "TDL" },
+      { code: "TRH", name: "スイスファミリー・ツリーハウス", category: "TDL" },
+      { code: "TIK", name: "魅惑のチキルーム", category: "TDL" },
+      { code: "TOR", name: "シアターオーリンズ", category: "TDL" },
+      { code: "BAZ", name: "アドベンチャーランド・バザール", category: "TDL" },
+      { code: "CRI", name: "クリスタルアーツ", category: "TDL" },
+      { code: "GOL", name: "ゴールデンガリオン", category: "TDL" },
+      { code: "JGL", name: "ジャングルカーニバル", category: "TDL" },
+      { code: "PGG", name: "パーティグラ・ギフト", category: "TDL" },
+      { code: "PIT", name: "パイレーツ・トレジャー", category: "TDL" },
+      { code: "PAR", name: "ラ・プティート・パフュームリー", category: "TDL" },
+      { code: "LMB", name: "ル・マルシェ・ブルー", category: "TDL" },
+      { code: "COL", name: "カフェ・オーリンズ", category: "TDL" },
+      { code: "CRP", name: "クリスタルパレス・レストラン", category: "TDL" },
+      { code: "GZB", name: "ザ・ガゼーボ", category: "TDL" },
+      { code: "SKP", name: "スキッパーズ・ギャレー", category: "TDL" },
+      { code: "SQJ", name: "スクウィーザーズ・トロピカル・ジュースバー", category: "TDL" },
+      { code: "CNV", name: "チャイナボイジャー", category: "TDL" },
+      { code: "PSW", name: "パークサイドワゴン", category: "TDL" },
+      { code: "BBY", name: "ブルーバイユー・レストラン", category: "TDL" },
+      { code: "FFO", name: "フレッシュフルーツオアシス", category: "TDL" },
+      { code: "BRB", name: "ボイラールーム・バイツ", category: "TDL" },
+      { code: "PLT", name: "ポリネシアンテラス・レストラン", category: "TDL" },
+      { code: "RSV", name: "ロイヤルストリート・ベランダ", category: "TDL" },
+      { code: "WSG", name: "ウエスタンランド・シューティングギャラリー", category: "TDL" },
+      { code: "CBT", name: "カントリーベア・シアター", category: "TDL" },
+      { code: "MRK", name: "蒸気船マークトウェイン号", category: "TDL" },
+      { code: "TSI", name: "トムソーヤ島いかだ", category: "TDL" },
+      { code: "BTM", name: "ビッグサンダー・マウンテン", category: "TDL" },
+      { code: "WGT", name: "ウッドチャック・グリーティングトレイル", category: "TDL" },
+      { code: "WES", name: "ウエスタンウエア", category: "TDL" },
+      { code: "PIC", name: "ウエスタンランド写真館", category: "TDL" },
+      { code: "BEA", name: "カントリーベア・バンドワゴン", category: "TDL" },
+      { code: "GEN", name: "ゼネラルストア", category: "TDL" },
+      { code: "POS", name: "トレーディングポスト", category: "TDL" },
+      { code: "HAP", name: "ハッピーキャンパーサプライ", category: "TDL" },
+      { code: "FRO", name: "フロンティア・ウッドクラフト", category: "TDL" },
+      { code: "CCH", name: "カウボーイ・クックハウス", category: "TDL" },
+      { code: "CWK", name: "キャンプ・ウッドチャック・キッチン", category: "TDL" },
+      { code: "DHS", name: "ザ・ダイヤモンドホースシュー", category: "TDL" },
+      { code: "HBR", name: "ハングリーベア・レストラン", category: "TDL" },
+      { code: "PPV", name: "プラザパビリオン・レストラン", category: "TDL" },
+      { code: "PBC", name: "ペコスビル・カフェ", category: "TDL" },
+      { code: "SPL", name: "スプラッシュ・マウンテン", category: "TDL" },
+      { code: "CNU", name: "ビーバーブラザーズのカヌー探検", category: "TDL" },
+      { code: "SPS", name: "スプラッシュダウン・フォト", category: "TDL" },
+      { code: "HHH", name: "フート＆ハラー・ハイドアウト", category: "TDL" },
+      { code: "GSK", name: "グランマ・サラのキッチン", category: "TDL" },
+      { code: "RRS", name: "ラケッティのラクーンサルーン", category: "TDL" },
+      { code: "ATP", name: "アリスのティーパーティー", category: "TDL" },
+      { code: "SMW", name: "イッツ・ア・スモールワールド", category: "TDL" },
+      { code: "CAC", name: "キャッスルカルーセル", category: "TDL" },
+      { code: "SNW", name: "白雪姫と七人の小人", category: "TDL" },
+      { code: "CFT", name: "シンデレラのフェアリーテイル・ホール", category: "TDL" },
+      { code: "DMB", name: "空飛ぶダンボ", category: "TDL" },
+      { code: "PPN", name: "ピーターパン空の旅", category: "TDL" },
+      { code: "EBB", name: "美女と野獣“魔法のものがたり”", category: "TDL" },
+      { code: "PIN", name: "ピノキオの冒険旅行", category: "TDL" },
+      { code: "POH", name: "プーさんのハニーハント", category: "TDL" },
+      { code: "HMN", name: "ホーンテッドマンション", category: "TDL" },
+      { code: "PHM", name: "ミッキーのフィルハーマジック", category: "TDL" },
+      { code: "FFT", name: "ファンタジーランド・フォレストシアター", category: "TDL" },
+      { code: "GLA", name: "ガラスの靴", category: "TDL" },
+      { code: "KNG", name: "キングダム・トレジャー", category: "TDL" },
+      { code: "STW", name: "ストロンボリズ・ワゴン", category: "TDL" },
+      { code: "HAR", name: "ハーモニーフェア", category: "TDL" },
+      { code: "VIP", name: "ビレッジショップス", category: "TDL" },
+      { code: "BLT", name: "ブレイブリトルテイラー・ショップ", category: "TDL" },
+      { code: "PLE", name: "プレジャーアイランド・キャンディーズ", category: "TDL" },
+      { code: "CHG", name: "キャプテンフックス・ギャレー", category: "TDL" },
+      { code: "QOH", name: "クイーン・オブ・ハートのバンケットホール", category: "TDL" },
+      { code: "TRT", name: "トルバドールタバン", category: "TDL" },
+      { code: "VPS", name: "ビレッジペイストリー", category: "TDL" },
+      { code: "LTG", name: "ラ・タベルヌ・ド・ガストン", category: "TDL" },
+      { code: "LFS", name: "ル・フウズ", category: "TDL" },
+      { code: "P10", name: "ル・プティポッパー", category: "TDL" },
+      { code: "GGC", name: "ガジェットのゴーコースター", category: "TDL" },
+      { code: "GPH", name: "グーフィーのペイント＆プレイハウス", category: "TDL" },
+      { code: "CDH", name: "チップとデールのツリーハウス", category: "TDL" },
+      { code: "TNP", name: "トゥーンパーク", category: "TDL" },
+      { code: "DNB", name: "ドナルドのボート", category: "TDL" },
+      { code: "MNH", name: "ミニーの家", category: "TDL" },
+      { code: "RRC", name: "ロジャーラビットのカートゥーンスピン", category: "TDL" },
+      { code: "MMH", name: "ミッキーの家とミート・ミッキー", category: "TDL" },
+      { code: "MNS", name: "ミニーのスタイルスタジオ", category: "TDL" },
+      { code: "GAG", name: "ギャグファクトリー／ファイブ・アンド・ダイム", category: "TDL" },
+      { code: "TDC", name: "トゥーンタウン・デリバリー・カンパニー", category: "TDL" },
+      { code: "TTT", name: "トゥーントーン・トリート", category: "TDL" },
+      { code: "P11", name: "トゥーンポップ", category: "TDL" },
+      { code: "HDL", name: "ヒューイ・デューイ・ルーイのグッドタイム・カフェ", category: "TDL" },
+      { code: "P15", name: "ポップ・ア・ロット・ポップコーン", category: "TDL" },
+      { code: "STT", name: "スター・ツアーズ", category: "TDL" },
+      { code: "STE", name: "スティッチ・エンカウンター", category: "TDL" },
+      { code: "SMT", name: "スペース・マウンテン", category: "TDL" },
+      { code: "BUZ", name: "バズ・ライトイヤーのアストロブラスター", category: "TDL" },
+      { code: "BMX", name: "ベイマックスのハッピーライド", category: "TDL" },
+      { code: "MOS", name: "モンスターズ・インク“ライド＆ゴーシーク!”", category: "TDL" },
+      { code: "SB", name: "ショーベース", category: "TDL" },
+      { code: "CEC", name: "コズミック・エンカウンター", category: "TDL" },
+      { code: "SGS", name: "スターゲイザーサプライ", category: "TDL" },
+      { code: "TRC", name: "トレジャーコメット", category: "TDL" },
+      { code: "PLM", name: "プラネットM", category: "TDL" },
+      { code: "MCS", name: "モンスターズ・インク・カンパニーストア", category: "TDL" },
+      { code: "SLD", name: "ソフトランディング", category: "TDL" },
+      { code: "TLT", name: "トゥモローランド・テラス", category: "TDL" },
+      { code: "PGP", name: "パン・ギャラクティック・ピザ・ポート", category: "TDL" },
+      { code: "BPP", name: "ビッグポップ", category: "TDL" },
+      { code: "PRD", name: "プラズマ・レイズ・ダイナー", category: "TDL" },
+      { code: "ODF", name: "アウトドアフード", category: "TDL" },
+
+      // TDSの例
+      { code: "GON", name: "ヴェネツィアン・ゴンドラ", category: "TDS" },
+      { code: "SOA", name: "ソアリン：ファンタスティック・フライト", category: "TDS" },
+      { code: "TRS", name: "ディズニーシー・トランジットスチーマーライン", category: "TDS" },
+      { code: "ILP", name: "イル・ポスティーノ・ステーショナリー", category: "TDS" },
+      { code: "VAL", name: "ヴァレンティーナズ・スウィート", category: "TDS" },
+      { code: "VIL", name: "ヴィラ・ドナルド・ホームショップ", category: "TDS" },
+      { code: "MBA", name: "バルーンベンダー(S)", category: "TDS" },
+      { code: "VCM", name: "ヴェネツィアン・カーニバル・マーケット", category: "TDS" },
+      { code: "EPR", name: "エンポーリオ", category: "TDS" },
+      { code: "GDI", name: "ガッレリーア・ディズニー", category: "TDS" },
+      { code: "SPD", name: "スプレンディード", category: "TDS" },
+      { code: "PMC", name: "ピッコロメルカート", category: "TDS" },
+      { code: "FIG", name: "フィガロズ・クロージアー", category: "TDS" },
+      { code: "FOT", name: "フォトグラフィカ", category: "TDS" },
+      { code: "BEL", name: "ベッラ・ミンニ・コレクション", category: "TDS" },
+      { code: "MVC", name: "マーチャント・オブ・ヴェニス・コンフェクション", category: "TDS" },
+      { code: "MIR", name: "ミラマーレ", category: "TDS" },
+      { code: "RIM", name: "リメンブランツェ", category: "TDS" },
+      { code: "CPF", name: "カフェ・ポルトフィーノ", category: "TDS" },
+      { code: "GOS", name: "ゴンドリエ・スナック", category: "TDS" },
+      { code: "ZBR", name: "ザンビーニ・ブラザーズ・リストランテ", category: "TDS" },
+      { code: "MGS", name: "マゼランズ", category: "TDS" },
+      { code: "MBB", name: "マンマ・ビスコッティーズ・ベーカリー", category: "TDS" },
+      { code: "RDC", name: "リストランテ・ディ・カナレット", category: "TDS" },
+      { code: "REF", name: "リフレスコス", category: "TDS" },
+      { code: "TUR", name: "タートル・トーク", category: "TDS" },
+      { code: "TOT", name: "タワー・オブ・テラー", category: "TDS" },
+      { code: "ELT", name: "ディズニーシー・エレクトリックレールウェイ", category: "TDS" },
+      { code: "TSM", name: "トイ・ストーリー・マニア!", category: "TDS" },
+      { code: "BCV", name: "ビッグシティ・ヴィークル", category: "TDS" },
+      { code: "DOC", name: "ドッグサイドステージ", category: "TDS" },
+      { code: "BMT", name: "ブロードウェイ・ミュージックシアター", category: "TDS" },
+      { code: "VGP", name: "ヴィレッジ・グリーティングプレイス", category: "TDS" },
+      { code: "ANT", name: "アーント・ペグズ・ヴィレッジストア", category: "TDS" },
+      
+      // ----- TDS（修正・独立させたロケーション） -----
+      { code: "SBM", name: "スチームボート・ミッキーズ", category: "TDS" },
+      { code: "SLK", name: "スリンキー・ドッグのギフトトロリー", category: "TDS" },
+      { code: "TTM", name: "タワー・オブ・テラー・メモラビリア", category: "TDS" },
+      { code: "NEN", name: "ニュージーズ・ノヴェルティ", category: "TDS" },
+      
+      { code: "MDE", name: "マクダックス・デパートメントストア", category: "TDS" }, 
+      { code: "SSD", name: "S.S.コロンビア・ダイニングルーム", category: "TDS" },
+      { code: "CCC", name: "ケープコッド・クックオフ", category: "TDS" },
+      { code: "CCO", name: "ケープコッド・コンフェクション", category: "TDS" },
+      { code: "TRL", name: "テディ・ルーズヴェルト・ラウンジ", category: "TDS" },
+      { code: "DEC", name: "デランシー・ケータリング", category: "TDS" },
+      { code: "DSD", name: "ドックサイドダイナー", category: "TDS" },
+      { code: "NYD", name: "ニューヨーク・デリ", category: "TDS" },
+      { code: "BBS", name: "バーナクル・ビルズ", category: "TDS" },
+      { code: "HTT", name: "ハイタイド・トリート", category: "TDS" },
+      { code: "HRH", name: "ハドソンリバー・ハーベスト", category: "TDS" },
+      { code: "PFF", name: "パパダキス・フレッシュフルーツ", category: "TDS" },
+      { code: "LLD", name: "リバティ・ランディング・ダイナー", category: "TDS" },
+      { code: "JRS", name: "レストラン櫻", category: "TDS" },
+      
+      { code: "AQT", name: "アクアトピア", category: "TDS" },
+      { code: "SRD", name: "ニモ＆フレンズ・シーライダー", category: "TDS" },
+      { code: "SWS", name: "スカイウォッチャー・スーヴェニア", category: "TDS" },
+      { code: "DIS", name: "ディスカバリーギフト", category: "TDS" },
+      { code: "SSS", name: "シーサイドスナック", category: "TDS" },
+      { code: "BWB", name: "ブリーズウェイ・バイツ", category: "TDS" },
+      { code: "BST", name: "ベイサイド・テイクアウト", category: "TDS" },
+      { code: "HZB", name: "ホライズンベイ・レストラン", category: "TDS" },
+      
+      { code: "IND", name: "インディ・ジョーンズ・アドベンチャー", category: "TDS" },
+      { code: "RST", name: "レイジングスピリッツ", category: "TDS" },
+      { code: "HAN", name: "ハンガーステージ", category: "TDS" },
+      { code: "M&F", name: "ミッキー＆フレンズ・グリーティングトレイル", category: "TDS" },
+      { code: "EXP", name: "エクスペディション・フォトアーカイヴ", category: "TDS" },
+      { code: "POP", name: "ペドラーズ・アウトポスト", category: "TDS" },
+      { code: "LOT", name: "ルックアウト・トレーダー", category: "TDS" },
+      { code: "EPE", name: "エクスペディション・イート", category: "TDS" },
+      { code: "TPA", name: "トロピック・アルズ", category: "TDS" },
+      { code: "YBC", name: "ユカタン・ベースキャンプ・グリル", category: "TDS" },
+      { code: "LCH", name: "ロストリバークックハウス", category: "TDS" },
+      { code: "MEC", name: "ミゲルズ・エルドラド・キャンティーナ", category: "TDS" }, 
+      
+      { code: "SIN", name: "シンドバッド・ストーリーブック・ヴォヤッジ", category: "TDS" },
+      { code: "MJT", name: "マジックランプシアター", category: "TDS" },
+      { code: "AGM", name: "アグラバーマーケットプレイス", category: "TDS" },
+      { code: "ABU", name: "アブーズ・バザール", category: "TDS" },
+      { code: "OSS", name: "オープンセサミ", category: "TDS" },
+      { code: "CFC", name: "カスバ・フードコート", category: "TDS" },
+      { code: "SLO", name: "サルタンズ・オアシス", category: "TDS" },
+      { code: "SAG", name: "サガラ・マーケットプレイス", category: "TDS" },
+      { code: "APG", name: "アリエルのプレイグラウンド", category: "TDS" },
+      { code: "FLG", name: "フランダーのフライングフィッシュコースター", category: "TDS" },
+      { code: "SCT", name: "スカットルのスクーター", category: "TDS" },
+      { code: "JMP", name: "ジャンピン・ジェリーフィッシュ", category: "TDS" },
+      { code: "BLW", name: "ブローフィッシュ・バルーンレース", category: "TDS" },
+      { code: "WRL", name: "ワールプール", category: "TDS" },
+      { code: "MSF", name: "マーメイドラグーンシアター", category: "TDS" },
+      { code: "KIS", name: "キス・デ・ガール・ファッション", category: "TDS" },
+      { code: "SLE", name: "スリーピーホエール・ショップ", category: "TDS" },
+      { code: "MTT", name: "マーメイドトレジャー", category: "TDS" },
+      { code: "SCK", name: "セバスチャンのカリプソキッチン", category: "TDS" }, 
+      
+      { code: "JOR", name: "センター・オブ・ジ・アース", category: "TDS" },
+      { code: "20K", name: "海底2万マイル", category: "TDS" },
+      { code: "NAU", name: "ノーチラスギフト", category: "TDS" },
+      { code: "NTG", name: "ノーチラスギャレー", category: "TDS" },
+      { code: "VCR", name: "ヴォルケイニア・レストラン", category: "TDS" },
+      { code: "RMS", name: "リフレッシュメント・ステーション", category: "TDS"},
+
+      { code: "ODV", name: "アウトドア・ベンダー", category: "TDS"},
+
+      { code: "F/S", name: "ファンタジースプリングス", category: "TDS"},
+      { code: "WAY", name: "ファンタジースプリングスエントリーウェイ", category: "TDS"},
+      { code: "FRZ", name: "アナとエルサのフローズンジャーニー", category: "TDS"},
+      { code: "RAP", name: "ラプンツェルのランタンフェスティバル", category: "TDS"},
+      { code: "PAN", name: "ピーターパンのネバーランドアドベンチャー", category: "TDS"},
+      { code: "TNK", name: "フェアリー・ティンカーベルのビジーバギー", category: "TDS"},
+
+      { code: "FSG", name: "ファンタジースプリングス・ギフト", category: "TDS"},
+      { code: "ARE", name: "アレンデール・ロイヤルバンケット", category: "TDS"},
+      { code: "OOK", name: "オーケンのオーケーフード", category: "TDS"},
+      { code: "DUC", name: "スナグリーダックリング", category: "TDS"},
+      { code: "LOK", name: "ルックアウト・クックアウト", category: "TDS"},
+
+      { code: "P11", name: "ポップコーンワゴン(ビジーバギー前)", category: "TDS"},
+      { code: "PWN", name: "パークウェイギフト・ノース", category: "TDS"},
+      { code: "PWS", name: "パークウェイギフト・サウス", category: "TDS"},
+
+      // パーク外の例
+      { code: "DAH", name: "ディズニーアンバサダーホテル", category: "OUT" },
+      { code: "FES", name: "フェスティバル・ディズニー", category: "OUT" },
+      { code: "DHM", name: "東京ディズニーシー・ホテルミラコスタ", category: "OUT" },
+      { code: "OCE", name: "オチェーアノ", category: "OUT" },
+      { code: "MIC", name: "ミッキランジェロ・ギフト", category: "OUT" },
+      { code: "TDH", name: "東京ディズニーランドホテル", category: "OUT" },
+      { code: "SWD", name: "シャーウッドガーデン・レストラン", category: "OUT" },
+      { code: "DMT", name: "ディズニー・マーカンタイル", category: "OUT" },
+      { code: "BBQ", name: "ビビディ・バビディ・ブティック（ホテル）", category: "OUT" },
+      { code: "DCH", name: "東京ディズニーセレブレーションホテル", category: "OUT" },
+      { code: "WIS", name: "セレブレーションホテル(ウィッシュ)", category: "OUT" },
+      { code: "DFW", name: "ディズニーファンタジー（ウィッシュ）", category: "OUT" },
+      { code: "DIS", name: "セレブレーションホテル(ディスカバー)", category: "OUT" },
+      { code: "DFD", name: "ディズニーファンタジー(ディスカバー)", category: "OUT" },
+      { code: "GFP", name: "ギフト・プラネット", category: "OUT" },
+      { code: "FSH", name: "ファンタジースプリングスホテル", category: "OUT" },
+      { code: "OHT", name: "オフィシャルホテル", category: "OUT" },
+      { code: "DHL", name: "ディズニーファンタジー(ヒルトン)", category: "OUT" },
+      { code: "DFO", name: "ディズニーファンタジー(オークラ)", category: "OUT" },
+      { code: "DFM", name: "ディズニーファンタジー(東京ベイ舞浜)", category: "OUT" },
+      { code: "DFG", name: "ディズニーファンタジー(グランドニッコー)", category: "OUT" },
+      { code: "MSH", name: "メインストリートハウス", category: "TDL" },
+      { code: "GRL", name: "ゲストリレーション", category: "TDS" },
+      { code: "TRG", name: "ツアーガイド", category: "OUT" },
+      { code: "LRC", name: "TDLチケットレセプション", category: "TDL" },
+      { code: "SRC", name: "TDSチケットレセプション", category: "TDS" },
+      { code: "LBR", name: "TDLベビーカーレンタル", category: "TDL" },
+      { code: "SBR", name: "TDSベビーカーレンタル", category: "TDS" },
+      { code: "LBC", name: "TDLベビーセンター", category: "TDL" },
+      { code: "SBC", name: "TDSベビーセンター", category: "TDS" },
+      { code: "TBC", name: "トゥーンタウンベビーセンター", category: "TDL" },
+      { code: "CFA", name: "中央救護室(L)", category: "TDL" },
+      { code: "CFA", name: "中央救護室(S)", category: "TDS" },
+      { code: "LEN", name: "TDLエントランス", category: "TDL" },
+      { code: "SEN", name: "TDSエントランス", category: "TDS" },
+      { code: "FEN", name: "ファンタジースプリングスエントランス", category: "TDS" },
+      { code: "FSI", name: "ファンタジースプリングスインフォメーション", category: "TDS" },
+      { code: "BAC", name: "ワールドバザール/アドベンカストーディアル", category: "TDL" },
+      { code: "FTC", name: "ファンタジーウェスト/トゥモローカストーディアル", category: "TDL" },
+      { code: "WFC", name: "ウエスタン/ファンタジーイーストカストーディアル", category: "TDL" },
+      { code: "LSE", name: "TDLセキュリティサービス", category: "TDL" },
+      { code: "SSE", name: "TDSセキュリティサービス", category: "TDS" },
+      { code: "RWS", name: "リゾートワイドセキュリティ", category: "OUT" },
+      { code: "MRC", name: "舞浜リゾートライン", category: "OUT" },
+      { code: "FDQ", name: "ファイヤー警防ユニット", category: "OUT" },
+      { code: "CEP", name: "セントラルエネルギープラント", category: "OUT" },
+      { code: "DSO", name: "ディズニーストアオンライン", category: "OUT" }
+
+      
+      // -------------------------------------------------------------------------
+    ];
+
+    const listElement = document.getElementById('list');
+    const searchInput = document.getElementById('searchInput');
+    const noResultElement = document.getElementById('noResult');
+    const resultArea = document.getElementById('resultArea');
+    const toggleBtn = document.getElementById('toggleBtn');
+    const tabContainer = document.getElementById('tabContainer');
+    const tabBtns = document.querySelectorAll('.tab-btn');
+
+    let isShowingAll = false;
+    let currentCategory = "TDL"; // 初期表示のタブ
+
+    // リストを描画する関数
+    function renderList(data) {
+      listElement.innerHTML = ''; 
+      
+      if (data.length === 0) {
+        noResultElement.style.display = 'block';
+      } else {
+        noResultElement.style.display = 'none';
+        data.forEach(item => {
+          const li = document.createElement('li');
+          const nameSpan = document.createElement('span');
+          nameSpan.className = 'name';
+          nameSpan.textContent = item.name;
+          const codeSpan = document.createElement('span');
+          codeSpan.className = 'code';
+          codeSpan.textContent = item.code;
+          li.appendChild(nameSpan);
+          li.appendChild(codeSpan);
+          listElement.appendChild(li);
+        });
+      }
+    }
+
+    // 特定のカテゴリのデータを表示する関数
+    function renderCategory(category) {
+      const filteredLocations = locations.filter(item => item.category === category);
+      renderList(filteredLocations);
+    }
+
+    // タブクリック時の処理
+    tabBtns.forEach(btn => {
+      btn.addEventListener('click', function() {
+        // アクティブなタブの見た目を切り替え
+        tabBtns.forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+        
+        // 選択されたカテゴリを取得して再描画
+        currentCategory = this.dataset.category;
+        renderCategory(currentCategory);
+      });
+    });
+
+    // 検索入力時の処理
+    searchInput.addEventListener('input', function() {
+      const filter = searchInput.value.toLowerCase().replace(/　/g, ' '); 
+      
+      if (filter.length > 0) {
+        // 検索時はタブを隠して、全カテゴリから検索
+        tabContainer.style.display = 'none';
+        resultArea.style.display = 'block';
+        
+        const filteredLocations = locations.filter(item => {
+          return item.name.toLowerCase().includes(filter) || 
+                 item.code.toLowerCase().includes(filter);
+        });
+        renderList(filteredLocations);
+        
+        isShowingAll = false;
+        toggleBtn.textContent = "全ロケーション一覧を表示";
+      } else {
+        // 検索文字が消えた時の処理
+        if (!isShowingAll) {
+          resultArea.style.display = 'none';
+          tabContainer.style.display = 'none';
+        } else {
+          // 一覧表示中だった場合は、現在のタブを表示
+          tabContainer.style.display = 'flex';
+          renderCategory(currentCategory);
+        }
+      }
+    });
+
+    // 「全ロケーション一覧を表示」のトグル処理
+    toggleBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      isShowingAll = !isShowingAll;
+      
+      if (isShowingAll) {
+        searchInput.value = ''; // 検索バーをリセット
+        tabContainer.style.display = 'flex'; // タブを表示
+        resultArea.style.display = 'block';
+        renderCategory(currentCategory); // 現在のカテゴリを描画
+        toggleBtn.textContent = "一覧を閉じる";
+      } else {
+        tabContainer.style.display = 'none';
+        resultArea.style.display = 'none';
+        toggleBtn.textContent = "全ロケーション一覧を表示";
+      }
+    });
+  </script>
+
+</body>
+</html>
