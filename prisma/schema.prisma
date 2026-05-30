@@ -1,0 +1,56 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Area {
+  id          String       @id @default(cuid())
+  park        String
+  code        String
+  name        String
+  englishName String
+  sortOrder   Int          @default(0)
+  attractions Attraction[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@unique([park, code])
+}
+
+model Attraction {
+  id              String  @id @default(cuid())
+  park            String
+  areaId          String
+  area            Area    @relation(fields: [areaId], references: [id])
+  threeLetterCode String  @unique
+  name            String
+  englishName     String
+  openDate        String?
+  sponsor         String?
+  rideSystem      String?
+  isIndoor        Boolean @default(true)
+  durationSec     Int?
+  capacity        Int?
+  vehicleNote     String?
+  promiseTime     Int?
+  dispatchTime    Int?
+  rotationClass   String?
+  rotationNote    String?
+  hasDPA          Boolean @default(false)
+  hasSingleRider  Boolean @default(false)
+  passNote        String?
+  heightMin       Int?
+  restrictionNote String?
+  bgs             String?
+  details         String?
+  operationNotes  String?
+  status          String  @default("DRAFT")
+  statusNote      String?
+  sortOrder       Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
